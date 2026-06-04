@@ -4,5 +4,4 @@ pandas
 openpyxl
 python-docx
 numpy
-ginza
-ja-ginza
+ja_core_news_sm==3.7.0  # 明确指定模型版本，避免云端下载失败
