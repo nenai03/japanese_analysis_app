@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Streamlit版日语文本分析工具：文本清洗 + 依存分析 + MDD计算 + 多文件对比
+适配Ginza模型（解决Streamlit Cloud权限/模型下载问题）
 部署命令：streamlit run japanese_analysis_app.py
 """
 import re
 import os
 import streamlit as st
 import spacy
+import ginza  # 必须导入Ginza，确保模型加载正常
 import pandas as pd
 from collections import Counter
 from docx import Document
@@ -23,28 +25,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 加载日语spaCy模型（首次运行自动下载，需联网）
+# 加载Ginza日语模型（核心修改：替换为ja_ginza，无权限问题）
 @st.cache_resource(show_spinner="正在加载日语NLP模型...")
 def load_spacy_model():
     try:
-        nlp = spacy.load("ja_core_news_sm")
+        # Ginza模型无需单独下载，pip install后直接加载
+        nlp = spacy.load("ja_ginza")
         return nlp
-    except OSError:
-        st.error("日语模型未找到，正在尝试自动下载...")
-        try:
-            import subprocess
-            import sys
-            subprocess.check_call([sys.executable, "-m", "spacy", "download", "ja_core_news_sm"])
-            nlp = spacy.load("ja_core_news_sm")
-            return nlp
-        except Exception as e:
-            st.error(f"模型下载失败：{e}")
-            st.info("请手动在终端执行：python -m spacy download ja_core_news_sm")
-            st.stop()
     except Exception as e:
-        st.error(f"日语模型加载失败：{e}")
+        st.error(f"Ginza模型加载失败：{str(e)}")
+        st.info("请确认requirements.txt包含 ginza 和 ja-ginza，并重启应用")
         st.stop()
 
+# 初始化模型（全局可用）
 nlp = load_spacy_model()
 
 # 初始化Session State（保存多文件数据、分析结果）
@@ -130,7 +123,7 @@ def read_uploaded_file(uploaded_file):
     file_name = uploaded_file.name
     try:
         if file_name.lower().endswith(".txt"):
-            # 支持多种编码
+            # 支持多种编码（适配日语文件）
             encodings = ['utf-8', 'shift_jis', 'euc-jp', 'iso-8859-1']
             content = ""
             for encoding in encodings:
@@ -140,7 +133,7 @@ def read_uploaded_file(uploaded_file):
                 except UnicodeDecodeError:
                     continue
             if not content:
-                st.warning(f"文件{file_name}编码不支持")
+                st.warning(f"文件{file_name}编码不支持（仅支持UTF-8/Shift_JIS/EUC-JP）")
                 return "", ""
             return file_name, content
         
@@ -182,7 +175,7 @@ def analyze_text(content, progress_bar=None):
     if not sentences:
         return [], 0.0, {}
     
-    # 依存分析
+    # 依存分析（Ginza和spaCy接口完全兼容，无需修改）
     analysis_data = []
     total_sents = len(sentences)
     
@@ -253,7 +246,7 @@ def get_excel_bytes(df, sheet_name="结果"):
 
 # ===================== 3. 网页界面布局 =====================
 def main():
-    st.title("📝 日语文本分析工具（Streamlit版）")
+    st.title("📝 日语文本分析工具（Ginza版）")
     st.divider()
     
     # 侧边栏：文件上传 + 操作
@@ -438,7 +431,7 @@ def main():
             st.subheader(f"依存分析结果：{active_file['name']}")
             
             if active_file["analysis_data"]:
-                # 转换为DataFrame展示
+                # 转换为DataFrame展示（Ginza分析结果和原spaCy格式一致）
                 analysis_header = [
                     "句子ID", "从属ID", "从属词", "词原型", "从属词性", "从属词性细标",
                     "核心ID", "核心词", "核心词原型", "核心词性", "核心词性细标", "依存关系"
@@ -539,7 +532,6 @@ def main():
             # MDD可视化
             st.divider()
             st.subheader("📊 MDD值可视化对比")
-            # 美化图表
             chart_data = df_compare.set_index("文件名")["平均依存距离(MDD)"]
             st.bar_chart(
                 chart_data,
@@ -549,7 +541,7 @@ def main():
                 color="#1f77b4"
             )
             
-            # 增加MDD统计信息
+            # MDD统计汇总
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("平均MDD值", round(df_compare["平均依存距离(MDD)"].mean(), 4))
