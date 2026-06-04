@@ -1,0 +1,8 @@
+streamlit>=1.35.0
+spacy>=3.7.0
+pandas
+openpyxl
+python-docx
+numpy
+ginza
+ja-ginza
