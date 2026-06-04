@@ -1,7 +1,10 @@
+# 基础依赖
 streamlit>=1.35.0
 spacy>=3.7.0
 pandas
 openpyxl
 python-docx
 numpy
-ja_core_news_sm==3.7.0  # 明确指定模型版本，避免云端下载失败
+# Ginza日语模型（核心替换）
+ginza
+ja-ginza
